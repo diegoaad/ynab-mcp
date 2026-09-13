@@ -74,6 +74,7 @@ async def test_list_accounts_is_scoped_and_read_only() -> None:
             "list_accounts",
             "get_budget_summary",
             "list_categories",
+            "list_transactions",
         }
         assert all(
             tool.annotations and tool.annotations.read_only_hint for tool in tools

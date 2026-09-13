@@ -1,13 +1,17 @@
 """MCP tool registration for local setup and one configured plan."""
 
+from typing import Annotated
+
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from ynab_mcp.client import YnabClient
 from ynab_mcp.config import Settings
 from ynab_mcp.errors import YnabError
 from ynab_mcp.tools.accounts import account_list
 from ynab_mcp.tools.months import budget_summary, category_list
+from ynab_mcp.tools.transactions import transaction_list
 
 
 def build_server(settings: Settings, client: YnabClient) -> MCPServer:
@@ -34,6 +38,28 @@ def build_server(settings: Settings, client: YnabClient) -> MCPServer:
         async def list_accounts(include_closed: bool = False) -> dict[str, object]:
             """List signed account balances by scope; net totals are not spendable cash."""
             return await account_list(client, include_closed)
+
+        @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
+        async def list_transactions(
+            since_date: str,
+            until_date: str,
+            account_id: str | None = None,
+            category_id: str | None = None,
+            payee_id: str | None = None,
+            limit: Annotated[int, Field(ge=1, le=500)] = 100,
+            include_memo: bool = False,
+        ) -> dict[str, object]:
+            """List bounded transaction details for inclusive dates; memos are opt-in."""
+            return await transaction_list(
+                client,
+                since_date,
+                until_date,
+                account_id=account_id,
+                category_id=category_id,
+                payee_id=payee_id,
+                limit=limit,
+                include_memo=include_memo,
+            )
 
         @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
         async def get_budget_summary(month: str | None = None) -> dict[str, object]:
