@@ -44,3 +44,43 @@ Branch: `codex/ynab-mcp-phase1`
 The projection exposes only stable account identity/scope fields and formatted cleared, uncleared, and total balances; it does not return raw YNAB metadata, bodies, headers, notes, or other upstream fields. Account and currency shape failures become the sanitized `incomplete_data` error. The server conditional keeps setup mode limited to `list_plans`, and the account tool carries `readOnlyHint=true`.
 
 No Task 5 implementation concerns remain. As with earlier tasks, the verification uses synthetic offline responses and does not assert live API behavior. Repository-wide formatting of pre-existing Markdown plan snippets remains outside the source/test check.
+
+## Review fix: structured totals basis label
+
+The review identified that the signed-net semantics were present only in code and
+tool prose. `account_result` now returns stable top-level `totals_basis` metadata
+with the exact value `signed net account balances; not spendable cash`, and the
+focused test asserts it.
+
+### TDD evidence
+
+1. Added the `totals_basis` assertion to `tests/test_accounts.py` before changing
+   the projection.
+2. RED command:
+
+   ```text
+   UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run pytest tests/test_accounts.py -q
+   ```
+
+   Result: exit 1; `1 failed, 3 passed in 0.53s`, with the expected
+   `KeyError: 'totals_basis'`.
+3. Added the stable `_TOTALS_BASIS` constant and included it beside `totals` in
+   the structured result.
+4. GREEN focused command:
+
+   ```text
+   UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run pytest tests/test_accounts.py -q
+   ```
+
+   Result: `4 passed in 0.42s`.
+
+### Review-fix verification
+
+- `UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run pytest -q` — `49 passed in 0.87s`.
+- `UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run ruff check src tests` — `All checks passed!`.
+- `UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run ruff format --check src tests` — `19 files already formatted`.
+- `UV_CACHE_DIR=/private/tmp/ynab-mcp-phase1-uv-cache uv run mypy src` — `Success: no issues found in 10 source files`.
+- `git diff --check` — passed with no output.
+
+Review-fix concerns: none. The reviewer’s deleted-account fixture observation is
+deferred for final review as requested.

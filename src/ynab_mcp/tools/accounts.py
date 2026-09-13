@@ -7,6 +7,8 @@ from ynab_mcp.client import YnabClient
 from ynab_mcp.errors import YnabError
 from ynab_mcp.money import CurrencyFormat, format_milliunits
 
+_TOTALS_BASIS = "signed net account balances; not spendable cash"
+
 
 def currency_from_plan(metadata: dict[str, Any]) -> CurrencyFormat:
     """Extract and validate the configured plan's currency format."""
@@ -95,6 +97,7 @@ def account_result(
             # This is a signed net balance across selected account scopes.
             "all_included": _format_balance(on_budget + tracking, currency),
         },
+        "totals_basis": _TOTALS_BASIS,
         "accounts": projected_accounts,
         "as_of_utc": datetime.now(UTC).isoformat(),
         "complete": True,

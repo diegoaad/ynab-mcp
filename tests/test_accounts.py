@@ -18,6 +18,7 @@ async def test_totals_are_signed_and_labeled() -> None:
         "tracking": "200.00",
         "all_included": "1050.00",
     }
+    assert result["totals_basis"] == "signed net account balances; not spendable cash"
     assert all(not account["closed"] for account in result["accounts"])
     assert result["complete"] is True
     as_of_utc = result["as_of_utc"]
