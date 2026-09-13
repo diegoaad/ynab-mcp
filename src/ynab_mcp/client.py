@@ -24,11 +24,20 @@ _STATUS_CODES = {
 
 
 async def _read_bounded(response: httpx.Response) -> bytes:
-    body = bytearray()
-    async for chunk in response.aiter_bytes():
-        body.extend(chunk)
-        if len(body) > MAX_BODY_BYTES:
+    encoding = response.headers.get("content-encoding", "identity")
+    if encoding.strip().lower() != "identity":
+        raise YnabError("incomplete_data")
+    if response.is_stream_consumed:
+        # MockTransport may hand back a response with content already loaded.
+        loaded = response.content
+        if len(loaded) > MAX_BODY_BYTES:
             raise YnabError("incomplete_data")
+        return loaded
+    body = bytearray()
+    async for chunk in response.aiter_raw():
+        if len(body) + len(chunk) > MAX_BODY_BYTES:
+            raise YnabError("incomplete_data")
+        body.extend(chunk)
     return bytes(body)
 
 
@@ -63,7 +72,10 @@ class YnabClient:
                     "GET",
                     path,
                     params=params,
-                    headers={"Authorization": f"Bearer {self._settings.pat}"},
+                    headers={
+                        "Authorization": f"Bearer {self._settings.pat}",
+                        "Accept-Encoding": "identity",
+                    },
                 ) as response,
             ):
                 if response.status_code != 200:

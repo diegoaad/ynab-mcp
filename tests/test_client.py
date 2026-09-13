@@ -1,3 +1,4 @@
+import gzip
 from collections.abc import AsyncIterator
 from datetime import date
 from uuid import UUID
@@ -30,6 +31,7 @@ async def test_only_ynab_get_with_bearer() -> None:
     assert seen[0].method == "GET"
     assert str(seen[0].url) == f"https://api.ynab.com/v1/plans/{PLAN_ID}/accounts"
     assert seen[0].headers["authorization"] == f"Bearer {TOKEN}"
+    assert seen[0].headers["accept-encoding"] == "identity"
 
 
 @pytest.mark.anyio
@@ -234,3 +236,36 @@ async def test_streamed_response_over_eight_mib_is_rejected() -> None:
         await YnabClient(scoped_settings(), httpx.MockTransport(handler)).get_accounts()
     assert caught.value.code == "incomplete_data"
     assert len(seen) == 1
+
+
+@pytest.mark.anyio
+async def test_single_oversized_raw_chunk_is_rejected() -> None:
+    class OversizedStream(httpx.AsyncByteStream):
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            yield b"x" * (8 * 1024 * 1024 + 1)
+
+    client = YnabClient(
+        scoped_settings(),
+        httpx.MockTransport(
+            lambda request: httpx.Response(200, stream=OversizedStream())
+        ),
+    )
+    with pytest.raises(YnabError) as caught:
+        await client.get_accounts()
+    assert caught.value.code == "incomplete_data"
+
+
+@pytest.mark.anyio
+async def test_compressed_response_is_rejected_without_decompression() -> None:
+    encoded = gzip.compress(b'{"data":{"accounts":[]}}')
+    client = YnabClient(
+        scoped_settings(),
+        httpx.MockTransport(
+            lambda request: httpx.Response(
+                200, content=encoded, headers={"content-encoding": "gzip"}
+            )
+        ),
+    )
+    with pytest.raises(YnabError) as caught:
+        await client.get_accounts()
+    assert caught.value.code == "incomplete_data"
