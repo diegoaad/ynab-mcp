@@ -15,6 +15,8 @@ def parse_month(value: str | None) -> date:
 
 def parse_window(start: str, end: str) -> tuple[date, date]:
     first, last = date.fromisoformat(start), date.fromisoformat(end)
+    if first.isoformat() != start or last.isoformat() != end:
+        raise ValueError("dates must use YYYY-MM-DD")
     if not first <= last or (last - first).days + 1 > 366:
         raise ValueError("date window must span 1 through 366 days")
     return first, last

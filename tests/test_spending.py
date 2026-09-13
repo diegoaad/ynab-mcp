@@ -86,6 +86,13 @@ async def test_category_summary_uses_all_rows_before_projection() -> None:
     assert result["since_date"] == "2026-07-01"
     assert result["until_date"] == "2026-09-13"
     assert result["currency"] == "USD"
+    assert result["exclusions"] == [
+        "deleted_transactions",
+        "pending_transactions_not_returned_by_api",
+        "tracking_account_postings",
+        "ready_to_assign_inflows",
+        "uncategorized_on_budget_transfers",
+    ]
 
 
 @pytest.mark.anyio

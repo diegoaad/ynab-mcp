@@ -157,9 +157,45 @@ async def test_combined_filters_match_split_category_then_cap() -> None:
     assert result["truncated"] is False
     assert result["complete"] is True
     assert any(
-        request.url.path == f"/v1/plans/{PLAN_ID}/accounts/{ACCOUNT}/transactions"
-        for request in calls
+        request.url.path == f"/v1/plans/{PLAN_ID}/transactions" for request in calls
     )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "filter_name, child_field, child_value",
+    [("payee_id", "payee_id", PAYEE), ("category_id", "category_id", CATEGORY)],
+)
+async def test_split_child_filter_uses_complete_plan_listing(
+    filter_name: str, child_field: str, child_value: str
+) -> None:
+    split = row(
+        8,
+        payee_id=OTHER,
+        category_id=OTHER,
+        subtransactions=[
+            {
+                "id": "child",
+                "amount": -12340,
+                "category_id": OTHER,
+                "payee_id": OTHER,
+                child_field: child_value,
+            }
+        ],
+    )
+    calls: list[httpx.Request] = []
+    result = await transaction_list(
+        transaction_fixture_client([split], calls),
+        "2026-09-01",
+        "2026-09-30",
+        **{filter_name: child_value},
+    )
+    assert [item["id"] for item in result["transactions"]] == [split["id"]]
+    assert [
+        request.url.path
+        for request in calls
+        if request.url.path.endswith("/transactions")
+    ] == [f"/v1/plans/{PLAN_ID}/transactions"]
 
 
 @pytest.mark.anyio

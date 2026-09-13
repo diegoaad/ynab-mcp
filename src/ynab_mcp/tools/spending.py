@@ -153,6 +153,13 @@ def spending_result(
         "until_date": end.isoformat(),
         "groups": groups,
         "coverage": coverage,
+        "exclusions": [
+            "deleted_transactions",
+            "pending_transactions_not_returned_by_api",
+            "tracking_account_postings",
+            "ready_to_assign_inflows",
+            "uncategorized_on_budget_transfers",
+        ],
         "as_of_utc": datetime.now(UTC).isoformat(),
         "complete": True,
     }

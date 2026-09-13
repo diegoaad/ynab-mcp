@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from decimal import Decimal
 
 
 @dataclass(frozen=True)
@@ -14,5 +13,9 @@ def format_milliunits(value: int, currency: CurrencyFormat) -> str:
     quantum = 10 ** (3 - currency.decimal_digits)
     if value % quantum:
         raise ValueError("milliunits exceed currency precision")
-    amount = Decimal(value) / Decimal(1000)
-    return f"{amount:.{currency.decimal_digits}f}"
+    whole, remainder = divmod(abs(value), 1000)
+    sign = "-" if value < 0 else ""
+    if currency.decimal_digits == 0:
+        return f"{sign}{whole}"
+    fraction = remainder // quantum
+    return f"{sign}{whole}.{fraction:0{currency.decimal_digits}d}"

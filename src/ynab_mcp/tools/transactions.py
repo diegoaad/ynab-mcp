@@ -61,10 +61,16 @@ def filter_and_sort_transactions(
             end is not None and parsed_date > end
         ):
             continue
-        if any(
-            identifier is not None and row.get(name) != str(identifier)
-            for name, identifier in ids.items()
-            if name != "category_id"
+        account_id = ids.get("account_id")
+        if account_id is not None and row.get("account_id") != str(account_id):
+            continue
+        payee_id = ids.get("payee_id")
+        if (
+            payee_id is not None
+            and row.get("payee_id") != str(payee_id)
+            and not any(
+                part.get("payee_id") == str(payee_id) for part in _subtransactions(row)
+            )
         ):
             continue
         category_id = ids.get("category_id")
@@ -183,7 +189,11 @@ async def transaction_list(
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 500:
         raise ValueError("limit must be 1 through 500")
     ids = validate_optional_uuids(account_id, category_id, payee_id)
-    rows = await client.get_transactions(start, end, **ids)
+    # Category and payee routes may omit a split parent whose child matches.
+    route_account = (
+        ids["account_id"] if not (ids["category_id"] or ids["payee_id"]) else None
+    )
+    rows = await client.get_transactions(start, end, account_id=route_account)
     filtered = filter_and_sort_transactions(rows, ids, start, end)
     currency = currency_from_plan(await client.get_plan_metadata())
     return transaction_result(

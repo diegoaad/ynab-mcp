@@ -23,6 +23,8 @@ async def _safe_result[T](result: Awaitable[T]) -> T:
         return await result
     except YnabError as error:
         raise ToolError(error.code) from None
+    except ValueError:
+        raise ToolError("bad_request") from None
 
 
 def build_server(settings: Settings, client: YnabClient) -> MCPServer:
