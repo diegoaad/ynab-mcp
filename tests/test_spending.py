@@ -171,6 +171,34 @@ def test_idless_named_payees_remain_separate_from_each_other_and_unknown() -> No
     }
 
 
+@pytest.mark.parametrize("blank_name", ["", "   "])
+def test_blank_idless_payee_does_not_merge_with_literal_unknown_name(
+    blank_name: str,
+) -> None:
+    postings = extract_postings(
+        spending_fixture_transactions(),
+        spending_fixture_accounts(),
+        spending_fixture_categories(),
+    )
+    idless = [
+        replace(postings[0], payee_id=None, payee_name=blank_name),
+        replace(
+            postings[1], payee_id=None, payee_name="Unknown payee", milliunits=-2000
+        ),
+    ]
+    totals = aggregate_postings(
+        idless,
+        "payee",
+        date(2026, 9, 1),
+        date(2026, 9, 13),
+        today=date(2026, 9, 13),
+    )
+    assert totals == {
+        "Unknown payee [unnamed]": {"milliunits": 70000, "coverage": "selected_range"},
+        "Unknown payee [name-only]": {"milliunits": 2000, "coverage": "selected_range"},
+    }
+
+
 def test_month_coverage_handles_28_30_and_current_month() -> None:
     buckets = aggregate_postings(
         [], "month", date(2026, 2, 1), date(2026, 9, 13), today=date(2026, 9, 13)

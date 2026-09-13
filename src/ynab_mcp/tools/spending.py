@@ -80,8 +80,14 @@ def aggregate_postings(
             identifier, name = posting.category_id, posting.category_name
             unnamed = False
         elif group_by == "payee":
-            identifier, name = posting.payee_id, posting.payee_name or "Unknown payee"
-            unnamed = posting.payee_id is None and posting.payee_name is None
+            raw_name = posting.payee_name
+            unnamed = raw_name is None or not raw_name.strip()
+            identifier = posting.payee_id
+            name = (
+                raw_name
+                if raw_name is not None and raw_name.strip()
+                else "Unknown payee"
+            )
         else:
             identifier, name = posting.account_id, posting.account_name
             unnamed = False
