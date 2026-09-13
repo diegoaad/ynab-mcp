@@ -194,3 +194,90 @@ async def transaction_list(
         end=end,
         currency=currency,
     )
+
+
+def actionable_uncategorized(
+    transactions: list[dict[str, Any]], accounts: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Flatten actionable uncategorized outflows, retaining parent context."""
+    accounts_by_id: dict[str, dict[str, Any]] = {}
+    for account in accounts:
+        account_id = account.get("id")
+        if not isinstance(account_id, str) or not account_id:
+            raise YnabError("incomplete_data")
+        if any(
+            not isinstance(account.get(flag), bool)
+            for flag in ("on_budget", "closed", "deleted")
+        ):
+            raise YnabError("incomplete_data")
+        accounts_by_id[account_id] = account
+
+    eligible: list[dict[str, Any]] = []
+    for tx in transactions:
+        if not isinstance(tx.get("deleted"), bool):
+            raise YnabError("incomplete_data")
+        if tx["deleted"]:
+            continue
+        account_id = tx.get("account_id")
+        if not isinstance(account_id, str) or account_id not in accounts_by_id:
+            raise YnabError("incomplete_data")
+        account = accounts_by_id[account_id]
+        if not account["on_budget"] or account["closed"] or account["deleted"]:
+            continue
+
+        parts = _subtransactions(tx)
+        for part in parts if parts else [tx]:
+            amount = part.get("amount")
+            if not isinstance(amount, int) or isinstance(amount, bool):
+                raise YnabError("incomplete_data")
+            category_id = _optional_text(part, "category_id")
+            transfer_id = _optional_text(part, "transfer_account_id")
+            if transfer_id is not None and transfer_id not in accounts_by_id:
+                raise YnabError("incomplete_data")
+            if amount >= 0 or category_id is not None:
+                continue
+            if transfer_id is not None and accounts_by_id[transfer_id]["on_budget"]:
+                continue
+            if parts:
+                part_id = part.get("id")
+                if not isinstance(part_id, str):
+                    raise YnabError("incomplete_data")
+                eligible.append(
+                    {
+                        **tx,
+                        **part,
+                        "id": part_id,
+                        "date": tx["date"],
+                        "account_id": account_id,
+                        "account_name": tx.get("account_name"),
+                        "amount": amount,
+                        "category_id": None,
+                        "category_name": None,
+                        "subtransactions": [],
+                    }
+                )
+            else:
+                eligible.append(tx)
+    return eligible
+
+
+async def uncategorized_transactions(
+    client: YnabClient, since_date: str, until_date: str, limit: int = 100
+) -> dict[str, object]:
+    """Return bounded uncategorized outflows from open on-budget accounts."""
+    start, end = parse_window(since_date, until_date)
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 500:
+        raise ValueError("limit must be 1 through 500")
+    transactions = await client.get_transactions(start, end)
+    accounts = await client.get_accounts()
+    filtered = filter_and_sort_transactions(transactions, {}, start, end)
+    eligible = actionable_uncategorized(filtered, accounts)
+    currency = currency_from_plan(await client.get_plan_metadata())
+    return transaction_result(
+        eligible[:limit],
+        truncated=len(eligible) > limit,
+        include_memo=False,
+        start=start,
+        end=end,
+        currency=currency,
+    )

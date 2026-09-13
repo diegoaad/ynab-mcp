@@ -12,7 +12,7 @@ from ynab_mcp.errors import YnabError
 from ynab_mcp.tools.accounts import account_list
 from ynab_mcp.tools.months import budget_summary, category_list
 from ynab_mcp.tools.spending import spending_summary
-from ynab_mcp.tools.transactions import transaction_list
+from ynab_mcp.tools.transactions import transaction_list, uncategorized_transactions
 
 
 def build_server(settings: Settings, client: YnabClient) -> MCPServer:
@@ -60,6 +60,17 @@ def build_server(settings: Settings, client: YnabClient) -> MCPServer:
                 payee_id=payee_id,
                 limit=limit,
                 include_memo=include_memo,
+            )
+
+        @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
+        async def get_uncategorized_transactions(
+            since_date: str,
+            until_date: str,
+            limit: Annotated[int, Field(ge=1, le=500)] = 100,
+        ) -> dict[str, object]:
+            """List actionable uncategorized outflows for inclusive dates."""
+            return await uncategorized_transactions(
+                client, since_date, until_date, limit=limit
             )
 
         @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
