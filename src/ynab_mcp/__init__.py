@@ -1,0 +1,1 @@
+"""YNAB MCP server package."""

@@ -49,10 +49,11 @@ Optional environment variables:
 
 ```text
 YNAB_READ_ONLY=true
-LOG_LEVEL=WARNING
 ```
 
 `YNAB_READ_ONLY` defaults to `true`. In Phase 1, any other value fails startup. The token must never appear in configuration errors, object representations, logs, stack traces returned to MCP clients, or documentation. Reject missing or blank tokens and malformed plan IDs before starting the MCP transport. Do not accept `default` or `last-used` as a plan ID.
+
+Logging is fixed at `WARNING` in Phase 1. A supplied `LOG_LEVEL` is rejected at startup so a requested verbosity is never silently ignored and SDK HTTP logging cannot be enabled through configuration.
 
 With no `YNAB_PLAN_ID`, the server starts in **setup-only mode**: it exposes `list_plans` and no plan-scoped tools. The user selects a UUID, sets `YNAB_PLAN_ID`, and restarts. When a plan ID is configured, `list_plans` is absent. The server makes no network request merely to start.
 
@@ -89,7 +90,7 @@ YNAB's current documented resource name is **plan**. Human-facing tool descripti
 
 `get_category_spending` can be added later if the above tools prove insufficient; it does not need to duplicate `get_spending_summary` in the first release. General payee and scheduled-transaction lists, and a broad `get_month` dump, are likewise deferred because the acceptance questions do not require them. Each additional tool must have a demonstrated use and bounded output.
 
-`available_in_categories` means the signed sum of `balance` for non-deleted, non-internal categories in the selected month, including hidden categories and credit-card payment categories. Ready to Assign is reported separately. This number is **not** labeled “cash available” or equated with the sum of account balances.
+`available_in_categories` means the signed sum of `balance` for non-deleted, non-internal categories in the selected month, including hidden categories. Ready to Assign is reported separately. The result carries explicit scope metadata: internal credit-card-payment category balances may be excluded because the documented month-category schema has no stable discriminator for them. This number is **not** labeled “cash available” or equated with the sum of account balances.
 
 All month arguments are `YYYY-MM-01`; invalid calendar dates or other days of month fail validation. “Current month” uses UTC, matching YNAB's documented date convention. Dates in ranges are inclusive. Date ranges cannot exceed 366 days in Phase 1. Financial results identify their as-of time or date range, currency, and whether they are complete. IDs are exact identifiers, never guessed from a name. A host can obtain a category ID from `list_categories`; ambiguous names require user clarification rather than silent selection.
 

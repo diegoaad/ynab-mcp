@@ -1,0 +1,23 @@
+[project]
+name = "ynab-mcp"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["mcp==2.2.0", "httpx==0.28.1"]
+
+[project.scripts]
+ynab-mcp = "ynab_mcp.main:main"
+
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "ruff==0.16.7", "mypy==2.3.1", "pip-audit==2.10.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["ynab_mcp"]
