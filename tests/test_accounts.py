@@ -70,9 +70,14 @@ async def test_list_accounts_is_scoped_and_read_only() -> None:
 
     async with Client(server) as mcp_client:
         tools = (await mcp_client.list_tools()).tools
-        assert {tool.name for tool in tools} == {"list_accounts"}
-        assert tools[0].annotations is not None
-        assert tools[0].annotations.read_only_hint is True
+        assert {tool.name for tool in tools} == {
+            "list_accounts",
+            "get_budget_summary",
+            "list_categories",
+        }
+        assert all(
+            tool.annotations and tool.annotations.read_only_hint for tool in tools
+        )
 
         result = await mcp_client.call_tool("list_accounts", {})
         assert not result.is_error
