@@ -3,6 +3,12 @@ import pytest
 from ynab_mcp.dates import parse_month, parse_window
 
 
+@pytest.mark.parametrize("value", ["20260901", "2026-W36-2"])
+def test_noncanonical_month_fails(value: str) -> None:
+    with pytest.raises(ValueError):
+        parse_month(value)
+
+
 def test_invalid_month_fails() -> None:
     with pytest.raises(ValueError):
         parse_month("2026-09-13")
