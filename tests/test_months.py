@@ -181,6 +181,7 @@ async def test_scoped_month_tools_are_read_only() -> None:
             "get_budget_summary",
             "list_categories",
             "list_transactions",
+            "get_spending_summary",
         }
         assert all(
             tool.annotations and tool.annotations.read_only_hint for tool in tools

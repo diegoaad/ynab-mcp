@@ -1,6 +1,6 @@
 """MCP tool registration for local setup and one configured plan."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -11,6 +11,7 @@ from ynab_mcp.config import Settings
 from ynab_mcp.errors import YnabError
 from ynab_mcp.tools.accounts import account_list
 from ynab_mcp.tools.months import budget_summary, category_list
+from ynab_mcp.tools.spending import spending_summary
 from ynab_mcp.tools.transactions import transaction_list
 
 
@@ -72,5 +73,14 @@ def build_server(settings: Settings, client: YnabClient) -> MCPServer:
         ) -> dict[str, object]:
             """List month category IDs, groups, balances, and available goals."""
             return await category_list(client, month, include_hidden)
+
+        @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
+        async def get_spending_summary(
+            start_date: str,
+            end_date: str,
+            group_by: Literal["category", "payee", "account", "month"],
+        ) -> dict[str, object]:
+            """Summarize complete net spending for inclusive dates by category, payee, account, or month."""
+            return await spending_summary(client, start_date, end_date, group_by)
 
     return mcp

@@ -138,3 +138,29 @@ def extract_postings(
             if posting is not None:
                 postings.append(posting)
     return postings
+
+
+def merge_month_categories(
+    month_data: list[dict[str, Any]], months: list[date]
+) -> list[dict[str, Any]]:
+    """Retain category identities across months, rejecting conflicting scope flags."""
+    categories_by_id: dict[str, dict[str, Any]] = {}
+    if len(month_data) != len(months):
+        raise YnabError("incomplete_data")
+    for data, month in zip(month_data, months, strict=True):
+        if data.get("month") != month.isoformat() or data.get("deleted") is not False:
+            raise YnabError("incomplete_data")
+        categories = data.get("categories")
+        if not isinstance(categories, list) or not all(
+            isinstance(category, dict) for category in categories
+        ):
+            raise YnabError("incomplete_data")
+        for category in categories:
+            category_id = _text(category, "id")
+            _text(category, "name")
+            internal = _bool(category, "internal")
+            previous = categories_by_id.get(category_id)
+            if previous is not None and previous["internal"] != internal:
+                raise YnabError("incomplete_data")
+            categories_by_id[category_id] = category
+    return list(categories_by_id.values())
