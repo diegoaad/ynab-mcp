@@ -71,30 +71,43 @@ def aggregate_postings(
             for month in months_between(start, end)
         }
 
-    amounts_by_id: dict[str | None, int] = defaultdict(int)
-    names_by_id: dict[str | None, set[str]] = defaultdict(set)
+    amounts_by_key: dict[tuple[str, str], int] = defaultdict(int)
+    names_by_key: dict[tuple[str, str], set[str]] = defaultdict(set)
     for posting in postings:
         if not start <= posting.date <= end:
             continue
         if group_by == "category":
             identifier, name = posting.category_id, posting.category_name
+            unnamed = False
         elif group_by == "payee":
             identifier, name = posting.payee_id, posting.payee_name or "Unknown payee"
+            unnamed = posting.payee_id is None and posting.payee_name is None
         else:
             identifier, name = posting.account_id, posting.account_name
-        amounts_by_id[identifier] -= posting.milliunits
-        names_by_id[identifier].add(name)
+            unnamed = False
+        if identifier is not None:
+            key = ("id", identifier)
+        elif unnamed:
+            key = ("unknown", "")
+        else:
+            key = ("name", name)
+        amounts_by_key[key] -= posting.milliunits
+        names_by_key[key].add(name)
 
     name_counts: dict[str, int] = defaultdict(int)
-    display_names = {
-        identifier: min(names) for identifier, names in names_by_id.items()
-    }
+    display_names = {key: min(names) for key, names in names_by_key.items()}
     for name in display_names.values():
         name_counts[name] += 1
     groups: dict[str, dict[str, int | str]] = {}
-    for identifier, total in amounts_by_id.items():
-        name = display_names[identifier]
-        label = name if name_counts[name] == 1 else f"{name} [{identifier or 'none'}]"
+    for key, total in amounts_by_key.items():
+        name = display_names[key]
+        if key[0] == "id":
+            qualifier = key[1]
+        elif key[0] == "name":
+            qualifier = "name-only"
+        else:
+            qualifier = "unnamed"
+        label = name if name_counts[name] == 1 else f"{name} [{qualifier}]"
         if label in groups:
             raise YnabError("incomplete_data")
         groups[label] = {"milliunits": total, "coverage": "selected_range"}
