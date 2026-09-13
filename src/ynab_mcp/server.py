@@ -6,6 +6,7 @@ from mcp.types import ToolAnnotations
 from ynab_mcp.client import YnabClient
 from ynab_mcp.config import Settings
 from ynab_mcp.errors import YnabError
+from ynab_mcp.tools.accounts import account_list
 
 
 def build_server(settings: Settings, client: YnabClient) -> MCPServer:
@@ -26,5 +27,11 @@ def build_server(settings: Settings, client: YnabClient) -> MCPServer:
             return {
                 "plans": [{"id": plan["id"], "name": plan["name"]} for plan in plans]
             }
+    else:
+
+        @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
+        async def list_accounts(include_closed: bool = False) -> dict[str, object]:
+            """List signed account balances by scope; net totals are not spendable cash."""
+            return await account_list(client, include_closed)
 
     return mcp
