@@ -91,3 +91,91 @@ def account_fixture_client() -> YnabClient:
         return httpx.Response(404, json={"error": "unexpected fixture route"})
 
     return YnabClient(scoped_settings(), httpx.MockTransport(handler))
+
+
+def spending_fixture_accounts() -> list[dict[str, object]]:
+    return [
+        {"id": "checking", "name": "Checking", "on_budget": True, "deleted": False},
+        {"id": "savings", "name": "Savings", "on_budget": True, "deleted": False},
+        {"id": "tracking", "name": "Brokerage", "on_budget": False, "deleted": False},
+    ]
+
+
+def spending_fixture_categories() -> list[dict[str, object]]:
+    return [
+        {"id": "restaurants", "name": "Restaurants", "internal": False},
+        {"id": "groceries", "name": "Groceries", "internal": False},
+        {"id": "ready", "name": "Ready to Assign", "internal": True},
+    ]
+
+
+def spending_fixture_transactions() -> list[dict[str, object]]:
+    def row(
+        id: str,
+        amount: int,
+        *,
+        account_id: str = "checking",
+        category_id: str | None = None,
+        transfer_account_id: str | None = None,
+        deleted: bool = False,
+        subtransactions: list[dict[str, object]] | None = None,
+    ) -> dict[str, object]:
+        return {
+            "id": id,
+            "date": "2026-09-10",
+            "account_id": account_id,
+            "amount": amount,
+            "category_id": category_id,
+            "payee_id": None,
+            "payee_name": None,
+            "transfer_account_id": transfer_account_id,
+            "deleted": deleted,
+            "subtransactions": subtransactions or [],
+        }
+
+    return [
+        row(
+            "split",
+            -90000,
+            subtransactions=[
+                row("split-restaurants", -70000, category_id="restaurants"),
+                row("split-groceries", -20000, category_id="groceries"),
+            ],
+        ),
+        row("refund", 5000, category_id="restaurants"),
+        row("uncategorized-purchase", -10000),
+        row("transfer-out", -30000, transfer_account_id="savings"),
+        row("transfer-in", 30000, account_id="savings", transfer_account_id="checking"),
+        row("tracking-side", -40000, account_id="tracking", category_id="restaurants"),
+        row("ready-inflow", 100000, category_id="ready"),
+        row("deleted", -500000, category_id="restaurants", deleted=True),
+    ]
+
+
+def spending_fixture_tracking_transfer() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "tracking-transfer",
+            "date": "2026-09-10",
+            "account_id": "checking",
+            "amount": -7000,
+            "category_id": "groceries",
+            "payee_id": None,
+            "payee_name": None,
+            "transfer_account_id": "tracking",
+            "deleted": False,
+            "subtransactions": [],
+        },
+        {
+            "id": "tracking-transfer-counterpart",
+            "date": "2026-09-10",
+            "account_id": "tracking",
+            "amount": 7000,
+            "category_id": "groceries",
+            "payee_id": None,
+            "payee_name": None,
+            "transfer_account_id": "checking",
+            "deleted": False,
+            "subtransactions": [],
+        },
+    ]
