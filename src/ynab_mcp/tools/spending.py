@@ -71,23 +71,29 @@ def aggregate_postings(
             for month in months_between(start, end)
         }
 
-    identities: dict[tuple[str | None, str], int] = defaultdict(int)
+    amounts_by_id: dict[str | None, int] = defaultdict(int)
+    names_by_id: dict[str | None, set[str]] = defaultdict(set)
     for posting in postings:
         if not start <= posting.date <= end:
             continue
         if group_by == "category":
-            identity = (posting.category_id, posting.category_name)
+            identifier, name = posting.category_id, posting.category_name
         elif group_by == "payee":
-            identity = (posting.payee_id, posting.payee_name or "Unknown payee")
+            identifier, name = posting.payee_id, posting.payee_name or "Unknown payee"
         else:
-            identity = (posting.account_id, posting.account_name)
-        identities[identity] -= posting.milliunits
+            identifier, name = posting.account_id, posting.account_name
+        amounts_by_id[identifier] -= posting.milliunits
+        names_by_id[identifier].add(name)
 
     name_counts: dict[str, int] = defaultdict(int)
-    for _, name in identities:
+    display_names = {
+        identifier: min(names) for identifier, names in names_by_id.items()
+    }
+    for name in display_names.values():
         name_counts[name] += 1
     groups: dict[str, dict[str, int | str]] = {}
-    for (identifier, name), total in identities.items():
+    for identifier, total in amounts_by_id.items():
+        name = display_names[identifier]
         label = name if name_counts[name] == 1 else f"{name} [{identifier or 'none'}]"
         if label in groups:
             raise YnabError("incomplete_data")

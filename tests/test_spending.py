@@ -125,6 +125,27 @@ def test_group_by_payee_account_and_month() -> None:
     assert totals["2026-09"]["coverage"] == "month_to_date"
 
 
+def test_same_payee_id_with_renamed_display_name_has_one_total() -> None:
+    postings = extract_postings(
+        spending_fixture_transactions(),
+        spending_fixture_accounts(),
+        spending_fixture_categories(),
+    )
+    renamed = [
+        replace(postings[0], payee_id="payee-1", payee_name="Cafe"),
+        replace(postings[1], payee_id="payee-1", payee_name="Cafe Renamed"),
+    ]
+    for ordering in (renamed, list(reversed(renamed))):
+        totals = aggregate_postings(
+            ordering,
+            "payee",
+            date(2026, 9, 1),
+            date(2026, 9, 13),
+            today=date(2026, 9, 13),
+        )
+        assert totals == {"Cafe": {"milliunits": 90000, "coverage": "selected_range"}}
+
+
 def test_month_coverage_handles_28_30_and_current_month() -> None:
     buckets = aggregate_postings(
         [], "month", date(2026, 2, 1), date(2026, 9, 13), today=date(2026, 9, 13)
