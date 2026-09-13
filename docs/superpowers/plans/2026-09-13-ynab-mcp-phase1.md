@@ -61,9 +61,11 @@ def test_setup_mode_and_secret_repr() -> None:
     assert settings.plan_id is None
     assert "sentinel-secret" not in repr(settings)
 
+
 def test_read_only_false_fails() -> None:
     with pytest.raises(ConfigError, match="read-only"):
         Settings.from_env({"YNAB_PAT": "sentinel-secret", "YNAB_READ_ONLY": "false"})
+
 
 def test_plan_alias_is_rejected() -> None:
     with pytest.raises(ConfigError):
@@ -140,18 +142,24 @@ Add `.env`, `.venv`, cache and build paths to `.gitignore`. `.env.example` conta
 ```python
 @pytest.mark.parametrize(
     ("milliunits", "digits", "expected"),
-    [(1000, 2, "1.00"), (123450, 2, "123.45"), (-42100, 2, "-42.10"),
-     (1300, 1, "1.3"),
-     (-395032, 3, "-395.032")],
+    [
+        (1000, 2, "1.00"),
+        (123450, 2, "123.45"),
+        (-42100, 2, "-42.10"),
+        (1300, 1, "1.3"),
+        (-395032, 3, "-395.032"),
+    ],
 )
 def test_exact_money(milliunits: int, digits: int, expected: str) -> None:
     assert format_milliunits(milliunits, CurrencyFormat("USD", digits)) == expected
+
 
 def test_invalid_precision_and_month() -> None:
     with pytest.raises(ValueError):
         format_milliunits(1001, CurrencyFormat("USD", 2))
     with pytest.raises(ValueError):
         parse_month("2026-09-13")
+
 
 def test_window_is_inclusive_and_bounded() -> None:
     assert parse_window("2026-09-01", "2026-09-01")[0].day == 1
@@ -168,6 +176,7 @@ class CurrencyFormat:
     iso_code: str
     decimal_digits: int
 
+
 def format_milliunits(value: int, currency: CurrencyFormat) -> str:
     if currency.decimal_digits not in (0, 1, 2, 3):
         raise ValueError("unsupported currency precision")
@@ -177,11 +186,17 @@ def format_milliunits(value: int, currency: CurrencyFormat) -> str:
     amount = Decimal(value) / Decimal(1000)
     return f"{amount:.{currency.decimal_digits}f}"
 
+
 def parse_month(value: str | None) -> date:
-    month = datetime.now(timezone.utc).date().replace(day=1) if value is None else date.fromisoformat(value)
+    month = (
+        datetime.now(timezone.utc).date().replace(day=1)
+        if value is None
+        else date.fromisoformat(value)
+    )
     if month.day != 1:
         raise ValueError("month must be the first day")
     return month
+
 
 def parse_window(start: str, end: str) -> tuple[date, date]:
     first, last = date.fromisoformat(start), date.fromisoformat(end)
@@ -205,19 +220,26 @@ def parse_window(start: str, end: str) -> tuple[date, date]:
 @pytest.mark.anyio
 async def test_only_ynab_get_with_bearer() -> None:
     seen: list[httpx.Request] = []
+
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         return httpx.Response(200, json={"data": {"accounts": []}})
+
     client = YnabClient(scoped_settings(), httpx.MockTransport(handler))
     assert await client.get_accounts() == []
     assert seen[0].method == "GET"
     assert seen[0].url.host == "api.ynab.com"
     assert seen[0].headers["authorization"] == "Bearer sentinel-secret"
 
+
 @pytest.mark.anyio
 async def test_error_never_contains_pat() -> None:
-    client = YnabClient(scoped_settings(), httpx.MockTransport(
-        lambda request: httpx.Response(401, text="sentinel-secret")))
+    client = YnabClient(
+        scoped_settings(),
+        httpx.MockTransport(
+            lambda request: httpx.Response(401, text="sentinel-secret")
+        ),
+    )
     with pytest.raises(YnabError) as caught:
         await client.get_accounts()
     assert "sentinel-secret" not in repr(caught.value)
@@ -232,10 +254,12 @@ Add parameterized cases for 400/401/403/404/409/429/500/503, timeout, malformed 
 BASE_URL = "https://api.ynab.com/v1"
 MAX_BODY_BYTES = 8 * 1024 * 1024
 
+
 class YnabError(Exception):
     def __init__(self, code: str, status: int | None = None) -> None:
         self.code, self.status = code, status
         super().__init__(code)
+
 
 async def _read_bounded(response: httpx.Response) -> bytes:
     body = bytearray()
@@ -262,12 +286,15 @@ Inside `YnabClient`, private `_get_data(path, params=None)` creates an `httpx.As
 ```python
 @pytest.mark.anyio
 async def test_setup_mode_exposes_only_list_plans() -> None:
-    server = build_server(Settings.from_env({"YNAB_PAT": "sentinel-secret"}), mocked_client())
+    server = build_server(
+        Settings.from_env({"YNAB_PAT": "sentinel-secret"}), mocked_client()
+    )
     async with Client(server) as mcp_client:
         names = {tool.name for tool in (await mcp_client.list_tools()).tools}
         assert names == {"list_plans"}
         result = await mcp_client.call_tool("delete_transaction", {})
         assert result.is_error
+
 
 @pytest.mark.anyio
 async def test_scoped_mode_hides_discovery() -> None:
@@ -286,12 +313,15 @@ The subprocess smoke test launches `uv run --frozen ynab-mcp` through `StdioServ
 def build_server(settings: Settings, client: YnabClient) -> MCPServer:
     mcp = MCPServer("YNAB personal plan")
     if settings.plan_id is None:
+
         @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
         async def list_plans() -> dict[str, object]:
             """List plan IDs and names for local setup."""
             return {"plans": await client.get_plans()}
+
         return mcp
     return mcp
+
 
 def main() -> None:
     settings = Settings.from_env(os.environ)
@@ -331,9 +361,13 @@ Use fixture balances of checking `1000000`, credit-card `-150000`, tracking `200
 - [ ] **Step 3: Implement projection and register the tool.**
 
 ```python
-async def account_list(client: YnabClient, include_closed: bool = False) -> dict[str, object]:
+async def account_list(
+    client: YnabClient, include_closed: bool = False
+) -> dict[str, object]:
     metadata, accounts = await client.get_plan_metadata(), await client.get_accounts()
-    included = [a for a in accounts if not a["deleted"] and (include_closed or not a["closed"])]
+    included = [
+        a for a in accounts if not a["deleted"] and (include_closed or not a["closed"])
+    ]
     on_budget = sum(a["balance"] for a in included if a["on_budget"])
     tracking = sum(a["balance"] for a in included if not a["on_budget"])
     currency = currency_from_plan(metadata)
@@ -364,6 +398,7 @@ async def test_month_summary_keeps_ready_to_assign_separate() -> None:
     assert result["available_in_categories"] == "240.00"
     assert result["age_of_money"] is None
 
+
 @pytest.mark.anyio
 async def test_hidden_category_is_filtered_only_from_listing() -> None:
     result = await category_list(month_fixture_client(), "2026-08-01")
@@ -376,11 +411,15 @@ The month fixture has ordinary balances `200000`, hidden `40000`, deleted `90000
 - [ ] **Step 3: Implement projections from `GET /plans/{id}/months/{month}`.**
 
 ```python
-async def budget_summary(client: YnabClient, month: str | None = None) -> dict[str, object]:
+async def budget_summary(
+    client: YnabClient, month: str | None = None
+) -> dict[str, object]:
     selected = parse_month(month)
     metadata, data = await client.get_plan_metadata(), await client.get_month(selected)
     categories = data["categories"]
-    available = sum(c["balance"] for c in categories if not c["deleted"] and not c["internal"])
+    available = sum(
+        c["balance"] for c in categories if not c["deleted"] and not c["internal"]
+    )
     return month_summary_result(metadata, data, selected, available)
 ```
 
@@ -402,15 +441,20 @@ Private helpers: `validate_optional_uuids(account_id, category_id, payee_id) -> 
 ```python
 @pytest.mark.anyio
 async def test_limit_is_output_only_and_marked() -> None:
-    result = await transaction_list(transaction_fixture_client(3), "2026-09-01", "2026-09-30", limit=2)
+    result = await transaction_list(
+        transaction_fixture_client(3), "2026-09-01", "2026-09-30", limit=2
+    )
     assert len(result["transactions"]) == 2
     assert result["truncated"] is True
     assert all("memo" not in row for row in result["transactions"])
 
+
 @pytest.mark.anyio
 async def test_limit_above_cap_is_rejected() -> None:
     with pytest.raises(ValueError):
-        await transaction_list(transaction_fixture_client(1), "2026-09-01", "2026-09-30", limit=501)
+        await transaction_list(
+            transaction_fixture_client(1), "2026-09-01", "2026-09-30", limit=501
+        )
 ```
 
 Add cases for `limit=0`, reversed dates, 367-day windows, non-UUID filters, `include_memo=true`, deleted rows, and deterministic sorting by date descending then ID. Verify combined filters after the client's most-specific route selection and that `truncated` reflects the fully filtered set.
@@ -419,18 +463,30 @@ Add cases for `limit=0`, reversed dates, 367-day windows, non-UUID filters, `inc
 - [ ] **Step 3: Implement validation, filtering, sorting, and projection.**
 
 ```python
-async def transaction_list(client: YnabClient, since_date: str, until_date: str, *,
-                           account_id: str | None = None, category_id: str | None = None,
-                           payee_id: str | None = None, limit: int = 100,
-                           include_memo: bool = False) -> dict[str, object]:
+async def transaction_list(
+    client: YnabClient,
+    since_date: str,
+    until_date: str,
+    *,
+    account_id: str | None = None,
+    category_id: str | None = None,
+    payee_id: str | None = None,
+    limit: int = 100,
+    include_memo: bool = False,
+) -> dict[str, object]:
     start, end = parse_window(since_date, until_date)
     if not 1 <= limit <= 500:
         raise ValueError("limit must be 1 through 500")
     ids = validate_optional_uuids(account_id, category_id, payee_id)
     rows = await client.get_transactions(start, end, **ids)
     filtered = filter_and_sort_transactions(rows, ids)
-    return transaction_result(filtered[:limit], truncated=len(filtered) > limit,
-                              include_memo=include_memo, start=start, end=end)
+    return transaction_result(
+        filtered[:limit],
+        truncated=len(filtered) > limit,
+        include_memo=include_memo,
+        start=start,
+        end=end,
+    )
 ```
 
 Private helpers in this file validate fields and convert amounts. Register `list_transactions` in `server.py` using bounded `Annotated[int, Field(ge=1, le=500)]` for MCP schema validation as well as internal validation.
@@ -451,7 +507,9 @@ Private helper: `eligible_posting(tx: dict, part: dict, internal_ids: set[str], 
 ```python
 def test_split_refund_and_transfer_are_counted_once() -> None:
     rows = spending_fixture_transactions()
-    postings = extract_postings(rows, spending_fixture_accounts(), spending_fixture_categories())
+    postings = extract_postings(
+        rows, spending_fixture_accounts(), spending_fixture_categories()
+    )
     by_category = defaultdict(int)
     for posting in postings:
         by_category[posting.category_name] += posting.milliunits
@@ -466,8 +524,9 @@ Fixture: split restaurant `-70000` and groceries `-20000` under a parent `-90000
 - [ ] **Step 3: Implement one posting per eligible non-split transaction or subtransaction.**
 
 ```python
-def extract_postings(transactions: list[dict], accounts: list[dict],
-                     categories: list[dict]) -> list[Posting]:
+def extract_postings(
+    transactions: list[dict], accounts: list[dict], categories: list[dict]
+) -> list[Posting]:
     on_budget = {a["id"] for a in accounts if a["on_budget"] and not a["deleted"]}
     internal = {c["id"] for c in categories if c["internal"]}
     result: list[Posting] = []
@@ -500,15 +559,22 @@ Each aggregate group has `milliunits: int` and `coverage: str`; month coverage i
 ```python
 @pytest.mark.anyio
 async def test_category_summary_uses_all_rows_before_projection() -> None:
-    result = await spending_summary(spending_fixture_client(), "2026-07-01", "2026-09-13", "category")
+    result = await spending_summary(
+        spending_fixture_client(), "2026-07-01", "2026-09-13", "category"
+    )
     assert result["complete"] is True
     assert result["groups"]["Restaurants"] == "65.00"
     assert result["groups"]["Uncategorized"] == "10.00"
 
+
 def test_current_month_bucket_is_labeled_partial() -> None:
-    buckets = aggregate_postings([], "month", date(2026, 8, 1), date(2026, 9, 13), today=date(2026, 9, 13))
+    buckets = aggregate_postings(
+        [], "month", date(2026, 8, 1), date(2026, 9, 13), today=date(2026, 9, 13)
+    )
     assert buckets["2026-09"]["coverage"] == "month_to_date"
-    prior = aggregate_postings([], "month", date(2026, 8, 1), date(2026, 8, 13), today=date(2026, 9, 13))
+    prior = aggregate_postings(
+        [], "month", date(2026, 8, 1), date(2026, 8, 13), today=date(2026, 9, 13)
+    )
     assert prior["2026-08"]["coverage"] == "partial_month"
 ```
 
@@ -518,18 +584,26 @@ Include group-by payee/account/month fixtures, a refund that reduces net spendin
 - [ ] **Step 3: Implement complete-range aggregation.**
 
 ```python
-async def spending_summary(client: YnabClient, start_date: str, end_date: str,
-                           group_by: Literal["category", "payee", "account", "month"]) -> dict[str, object]:
+async def spending_summary(
+    client: YnabClient,
+    start_date: str,
+    end_date: str,
+    group_by: Literal["category", "payee", "account", "month"],
+) -> dict[str, object]:
     start, end = parse_window(start_date, end_date)
     transactions = await client.get_transactions(start, end)
     accounts = await client.get_accounts()
     metadata = await client.get_plan_metadata()
     month_data = [await client.get_month(month) for month in months_between(start, end)]
-    categories = {category["id"]: category
-                  for data in month_data for category in data["categories"]}
+    categories = {
+        category["id"]: category
+        for data in month_data
+        for category in data["categories"]
+    }
     postings = extract_postings(transactions, accounts, list(categories.values()))
-    totals = aggregate_postings(postings, group_by, start, end,
-                                today=datetime.now(timezone.utc).date())
+    totals = aggregate_postings(
+        postings, group_by, start, end, today=datetime.now(timezone.utc).date()
+    )
     return spending_result(totals, metadata, start, end, complete=True)
 ```
 
@@ -549,17 +623,25 @@ For a range crossing months, collect month-specific category metadata as shown; 
 ```python
 @pytest.mark.anyio
 async def test_only_actionable_uncategorized_outflows() -> None:
-    result = await uncategorized_transactions(uncategorized_fixture_client(),
-                                               "2026-09-01", "2026-09-30")
-    assert [row["id"] for row in result["transactions"]] == ["purchase-1", "split-part-1"]
+    result = await uncategorized_transactions(
+        uncategorized_fixture_client(), "2026-09-01", "2026-09-30"
+    )
+    assert [row["id"] for row in result["transactions"]] == [
+        "purchase-1",
+        "split-part-1",
+    ]
+
 
 @pytest.mark.anyio
 async def test_scoped_mcp_tool_names_and_annotations() -> None:
     async with Client(build_server(scoped_settings(), mocked_client())) as mcp_client:
         tools = (await mcp_client.list_tools()).tools
         assert {t.name for t in tools} == {
-            "get_budget_summary", "list_accounts", "list_categories",
-            "list_transactions", "get_spending_summary",
+            "get_budget_summary",
+            "list_accounts",
+            "list_categories",
+            "list_transactions",
+            "get_spending_summary",
             "get_uncategorized_transactions",
         }
         assert all(t.annotations and t.annotations.read_only_hint for t in tools)
@@ -571,16 +653,22 @@ Fixture includes a purchase, an on-budget transfer, an inflow, a tracking-accoun
 - [ ] **Step 3: Implement eligibility, bounded output, and registration.**
 
 ```python
-async def uncategorized_transactions(client: YnabClient, since_date: str,
-                                     until_date: str, limit: int = 100) -> dict[str, object]:
+async def uncategorized_transactions(
+    client: YnabClient, since_date: str, until_date: str, limit: int = 100
+) -> dict[str, object]:
     start, end = parse_window(since_date, until_date)
     if not 1 <= limit <= 500:
         raise ValueError("limit must be 1 through 500")
     transactions = await client.get_transactions(start, end)
     accounts = await client.get_accounts()
     eligible = actionable_uncategorized(transactions, accounts)
-    return transaction_result(eligible[:limit], truncated=len(eligible) > limit,
-                              include_memo=False, start=start, end=end)
+    return transaction_result(
+        eligible[:limit],
+        truncated=len(eligible) > limit,
+        include_memo=False,
+        start=start,
+        end=end,
+    )
 ```
 
 `actionable_uncategorized(transactions: list[dict], accounts: list[dict]) -> list[dict]` is a private function in `tools/transactions.py`; it handles split parts, negative amount, open on-budget account, and no ordinary transfer. Use the full date-bounded listing because the documented `type=uncategorized` filter does not specify whether it includes parents with uncategorized split parts. Keep public IDs in results but no API request paths, raw bodies, or headers.
@@ -602,12 +690,18 @@ def test_local_env_file_is_not_tracked() -> None:
     assert ".env" not in tracked
     assert "<secret>" in Path(".env.example").read_text()
 
+
 @pytest.mark.anyio
-async def test_pat_is_redacted_at_mcp_boundary(caplog: pytest.LogCaptureFixture) -> None:
+async def test_pat_is_redacted_at_mcp_boundary(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     settings = scoped_settings()
     transport = httpx.MockTransport(
-        lambda request: httpx.Response(401, text="sentinel-secret"))
-    async with Client(build_server(settings, YnabClient(settings, transport))) as mcp_client:
+        lambda request: httpx.Response(401, text="sentinel-secret")
+    )
+    async with Client(
+        build_server(settings, YnabClient(settings, transport))
+    ) as mcp_client:
         result = await mcp_client.call_tool("list_accounts", {})
     assert result.is_error
     assert "sentinel-secret" not in repr(result)

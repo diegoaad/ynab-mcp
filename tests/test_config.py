@@ -22,20 +22,22 @@ def test_plan_alias_is_rejected() -> None:
         Settings.from_env({"YNAB_PAT": "sentinel-secret", "YNAB_PLAN_ID": "last-used"})
 
 
-def test_configured_plan_and_log_level_are_parsed() -> None:
+def test_configured_plan_is_parsed() -> None:
     plan_id = UUID("12345678-1234-5678-1234-567812345678")
 
     settings = Settings.from_env(
         {
             "YNAB_PAT": "  sentinel-secret  ",
             "YNAB_PLAN_ID": str(plan_id),
-            "LOG_LEVEL": "INFO",
         }
     )
 
-    assert settings == Settings(
-        pat="sentinel-secret", plan_id=plan_id, log_level="INFO"
-    )
+    assert settings == Settings(pat="sentinel-secret", plan_id=plan_id)
+
+
+def test_log_level_is_rejected_instead_of_silently_ignored() -> None:
+    with pytest.raises(ConfigError, match="LOG_LEVEL"):
+        Settings.from_env({"YNAB_PAT": "sentinel-secret", "LOG_LEVEL": "DEBUG"})
 
 
 def test_missing_or_blank_pat_fails() -> None:

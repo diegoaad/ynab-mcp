@@ -11,13 +11,9 @@ class ConfigError(ValueError):
 class Settings:
     pat: str
     plan_id: UUID | None
-    log_level: str = "WARNING"
 
     def __repr__(self) -> str:
-        return (
-            f"Settings(pat=<redacted>, plan_id={self.plan_id}, "
-            f"log_level={self.log_level})"
-        )
+        return f"Settings(pat=<redacted>, plan_id={self.plan_id})"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "Settings":
@@ -26,13 +22,11 @@ class Settings:
             raise ConfigError("YNAB_PAT is required")
         if env.get("YNAB_READ_ONLY", "true").lower() != "true":
             raise ConfigError("Phase 1 is read-only")
+        if "LOG_LEVEL" in env:
+            raise ConfigError("LOG_LEVEL is not supported; logging remains WARNING")
         raw_id = env.get("YNAB_PLAN_ID", "").strip()
         try:
             plan_id = UUID(raw_id) if raw_id else None
         except ValueError:
             raise ConfigError("YNAB_PLAN_ID must be a UUID") from None
-        return cls(
-            pat=pat,
-            plan_id=plan_id,
-            log_level=env.get("LOG_LEVEL", "WARNING"),
-        )
+        return cls(pat=pat, plan_id=plan_id)
