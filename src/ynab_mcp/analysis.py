@@ -120,6 +120,12 @@ def extract_postings(
             raise YnabError("incomplete_data")
         enriched_tx = {**tx, "account_name": account_names[account_id]}
         for part in parts if parts else [tx]:
+            transfer_account_id = _optional_text(part, "transfer_account_id")
+            if (
+                transfer_account_id is not None
+                and transfer_account_id not in account_names
+            ):
+                raise YnabError("incomplete_data")
             part_category_id = _optional_text(part, "category_id")
             if part_category_id is not None and part_category_id not in category_names:
                 raise YnabError("incomplete_data")

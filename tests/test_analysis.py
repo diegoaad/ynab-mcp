@@ -51,6 +51,15 @@ def test_categorized_tracking_transfer_counts_only_on_budget_side() -> None:
     ]
 
 
+def test_transfer_to_unknown_account_is_incomplete_data() -> None:
+    transfer = spending_fixture_transactions()[3]
+    transfer["transfer_account_id"] = "missing-destination"
+    with pytest.raises(YnabError, match="incomplete_data"):
+        extract_postings(
+            [transfer], spending_fixture_accounts(), spending_fixture_categories()
+        )
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
